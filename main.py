@@ -4,6 +4,7 @@ from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
 import os 
 from nav_tools import scroll_up, scroll_down, click_element, type, type_and_submit
+import json
 
 load_dotenv()
 
@@ -13,14 +14,13 @@ def get_page_info(url, save_path='screenshot.png'):
         page = browser.new_page()
         page.goto(url)
 
-        # page.screenshot(path=save_path)
-        # elements = ['button', 'a', 'input', 'select', 'textarea', 'div[onclick]', 'span[onclick]']; 
-
         element_info = page.evaluate(f'''() => {{
             const elements = Array.from(document.querySelectorAll("a, button, input"));
-            return elements.map((element, index) => {{
+            let result = {{}};
+            elements.forEach((element, index) => {{
                 const rect = element.getBoundingClientRect();
-                const isVisible = element.offsetWidth > 0 && element.offsetHeight > 0;
+                const style = window.getComputedStyle(element);
+                const isVisible = element.offsetWidth > 0 && element.offsetHeight > 0 && style.visibility !== 'hidden' && style.opacity !== '0' && style.display !== 'none';
 
                 const inViewport = (
                     rect.top >= 0 &&
@@ -30,10 +30,16 @@ def get_page_info(url, save_path='screenshot.png'):
                 );
 
                 if (inViewport && isVisible) {{
+                    let selector = element.tagName.toLowerCase();
+                    for (const attr of element.attributes) {{
+                        if (attr.name !== "style") {{
+                            selector += `[${{attr.name}}="${{attr.value}}"]`;
+                        }} 
+                    }}
+                    result[index] = selector;
                     element.style.border = "1px solid red";
-
                     const label = document.createElement("span");
-                    label.textContent = index + 1;
+                    label.textContent = index;
                     label.style.position = "absolute";
                     label.style.top = rect.top + "px";
                     label.style.left = rect.left + "px";
@@ -41,17 +47,12 @@ def get_page_info(url, save_path='screenshot.png'):
                     label.style.zIndex = 10000;
                     document.body.appendChild(label);
                 }}
-
-                let attributes = {{}};
-                for (let attr of element.attributes) {{
-                    attributes[attr.name] = attr.value;
-                }}
-                return {{tagName: element.tagName, attributes: attributes}};
             }});
+            return result;
         }}''')
         page.screenshot(path=save_path)
 
-        page.wait_for_timeout(5000)
+        page.wait_for_timeout(3000)
  
         # element_parents = [element.evaluate('node => node.parentElement.outerHTML') for element in elements]
         browser.close()
@@ -62,7 +63,14 @@ def encode_image(image_path):
   with open(image_path, "rb") as image_file:
     return base64.b64encode(image_file.read()).decode('utf-8')
 
-def get_gpt_action(client, base64_image, prompt, elements):
+                # 2. TYPE_AND_SUBMIT - type text into an input and press enter
+                # 3. SCROLL_UP - 
+                # 4. SCROLL_DOWN
+                # 5. GO_BACK
+                # 6. END
+                # You will reason about what actions to perform first, and only return the name of the first action that you want to do. 
+
+def get_gpt_action(client, base64_image, prompt):
     response = client.chat.completions.create(
     model="gpt-4-vision-preview",
     messages=[
@@ -75,16 +83,9 @@ def get_gpt_action(client, base64_image, prompt, elements):
                 You are on the page shown in this image. You will be provided with a task that will require you to interact with the browser and navigate to different pages. 
                 For each step, you will think about which actions you should preform to complete the task. You have the following actions available to you:
 
-                1. CLICK_ATTRIBUTE_X - click on a link, button, or input with the attribute key "ATTRIBUTE" and the value "X"
-                2. TYPE_AND_SUBMIT - type text into an input and press enter
-                3. SCROLL_UP - 
-                4. SCROLL_DOWN
-                5. GO_BACK
-                6. END
+                1. CLICK_X - click on a link, button, or input that has the label X
 
-                You are given the following elements on the page: {elements}
-                # You will reason about what actions to perform first, and only return the name of the first action that you want to do. 
-                Based on these, return the dictionary of the element that you want to click on first.
+                Based on the following task, return only a json of the format {{"id": number}} with the number label of the element in the page that you want to click on first. Do not return anything beyond JSON. any deviation will cause the system to fail.
                 Here is your task: {prompt}
                 """
             },
@@ -101,20 +102,38 @@ def get_gpt_action(client, base64_image, prompt, elements):
     max_tokens=300,
     )
 
-    print(response.choices[0])
-    return response.choices[0]
+    responseData = response.choices[0].message.content
+    print(responseData)
+    if responseData!= "{":
+        responseData = responseData[responseData.index("{"):responseData.rindex("}")+1]
+    return json.loads(response.choices[0].message.content)
 
 
 if __name__ == "__main__":
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    # user_prompt = input("Please enter a prompt: ")
+    user_prompt = input("Please enter a prompt: ")
+    # sample prompt: Help me buy a pair of women's medium gray sweatpants
 
     elements = get_page_info("https://amazon.com/")
-    # print(len(elements))
-
-    import json
     print(len(elements), json.dumps(elements, indent=4))
-    # base64_image = encode_image("screenshot.png")
+    # print(elements["4"])
+    base64_image = encode_image("screenshot.png")
 
-    # get_gpt_action(client, base64_image, user_prompt, elements)
+    response = get_gpt_action(client, base64_image, user_prompt)
+    selector_id = response["id"]
+    selector = elements[str(selector_id)]
+    print(selector_id, selector)
+
+    with sync_playwright() as playwright:
+        chromium = playwright.chromium
+        browser = chromium.launch(headless=False) # Set headless to False to visualize the actions
+        page = browser.new_page()
+        page.set_viewport_size({"width": page.viewport_size["width"], "height": page.viewport_size["height"]})
+        page.goto("https://www.amazon.com/")
+
+        page.wait_for_timeout(2000)
+        click_element(page, selector)
+        page.wait_for_timeout(20000)
+        page.close()
+
 
