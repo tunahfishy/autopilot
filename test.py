@@ -20,6 +20,9 @@ def run(playwright: Playwright):
     page.wait_for_timeout(2000)
     scroll_up(page)
     page.wait_for_timeout(2000) 
+    go_back(page)
+    page.wait_for_timeout(2000) 
+
     browser.close()
 
 with sync_playwright() as playwright:

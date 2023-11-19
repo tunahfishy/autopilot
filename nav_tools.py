@@ -18,3 +18,5 @@ def type_and_submit(page, selector, text):
     page.fill(selector, text)
     page.press(selector, 'Enter')
 
+def go_back(page):
+    page.go_back()
