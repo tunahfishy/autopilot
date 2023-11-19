@@ -16,12 +16,11 @@ def get_page_info(url, save_path='screenshot.png'):
         # page.screenshot(path=save_path)
         # elements = ['button', 'a', 'input', 'select', 'textarea', 'div[onclick]', 'span[onclick]']; 
 
-        x,y, distance = 300, 0, 200 #Example values
         element_info = page.evaluate(f'''() => {{
-            const x = {x}, y = {y}, distance = {distance};
             const elements = Array.from(document.querySelectorAll("a, button, input"));
-            return elements.filter(element => {{
+            return elements.map((element, index) => {{
                 const rect = element.getBoundingClientRect();
+                const isVisible = element.offsetWidth > 0 && element.offsetHeight > 0;
 
                 const inViewport = (
                     rect.top >= 0 &&
@@ -30,19 +29,19 @@ def get_page_info(url, save_path='screenshot.png'):
                     rect.right <= (window.innerWidth || document.documentElement.clientWidth)
                 );
 
-                if (!inViewport) {{
-                    return false;
+                if (inViewport && isVisible) {{
+                    element.style.border = "1px solid red";
+
+                    const label = document.createElement("span");
+                    label.textContent = index + 1;
+                    label.style.position = "absolute";
+                    label.style.top = rect.top + "px";
+                    label.style.left = rect.left + "px";
+                    label.style.color = "red";
+                    label.style.zIndex = 10000;
+                    document.body.appendChild(label);
                 }}
-                const elementCenterX = rect.left + rect.width / 2;
-                const elementCenterY = rect.top + rect.height / 2;
-                const dx = elementCenterX - x;
-                const dy = elementCenterY - y;
-                if (Math.sqrt(dx * dx + dy * dy) <= distance) {{
-                    element.style.background = "blue";
-                    return true;
-                }}
-                return false;
-            }}).map(element => {{
+
                 let attributes = {{}};
                 for (let attr of element.attributes) {{
                     attributes[attr.name] = attr.value;
@@ -52,7 +51,7 @@ def get_page_info(url, save_path='screenshot.png'):
         }}''')
         page.screenshot(path=save_path)
 
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(5000)
  
         # element_parents = [element.evaluate('node => node.parentElement.outerHTML') for element in elements]
         browser.close()
