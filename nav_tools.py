@@ -40,3 +40,7 @@ def end(page):
     """)
     page.wait_for_timeout(2000)
     page.close()
+
+def hover_element(page, selector):
+    page.hover(selector)
+    page.wait_for_timeout(2000)

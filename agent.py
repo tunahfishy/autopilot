@@ -46,6 +46,16 @@ class Agent:
         element_info = page.evaluate(f'''() => {{
             const elements = Array.from(document.querySelectorAll("a, button, input"));
             let result = {{}};
+            function isHiddenByAncestors(element) {{
+                while (element) {{
+                    const style = window.getComputedStyle(element);
+                    if (style.display === 'none' || style.visibility === 'hidden') {{
+                        return true;
+                    }}
+                    element = element.parentElement;
+                }}
+                return false;
+            }}
             elements.forEach((element, index) => {{
                 const rect = element.getBoundingClientRect();
                 const style = window.getComputedStyle(element);
@@ -58,7 +68,7 @@ class Agent:
                     rect.right <= (window.innerWidth || document.documentElement.clientWidth)
                 );
 
-                if (inViewport && isVisible) {{
+                if (inViewport && isVisible && !isHiddenByAncestors(element)) {{
                     let selector = element.tagName.toLowerCase();
                     for (const attr of element.attributes) {{
                         if (attr.name !== "style" && attr.name !== "class") {{
@@ -71,9 +81,12 @@ class Agent:
                     label.className = "autopilot-generated-label";
                     label.textContent = index;
                     label.style.position = "absolute";
-                    label.style.top = rect.top + "px";
-                    label.style.left = rect.left + "px";
-                    label.style.color = "blue";
+                    label.style.padding = "1px";
+                    label.style.top = (window.scrollY + rect.top) + "px";
+                    label.style.left = (window.scrollX + rect.left) + "px"; 
+                    label.style.color = "white";
+                    label.style.fontWeight = "bold";
+                    label.style.backgroundColor = "blue";
                     label.style.zIndex = 10000;
                     document.body.appendChild(label);
                 }}
@@ -105,19 +118,19 @@ class Agent:
                     You are on the page shown in this image. You will be provided with a task that will require you to interact with the browser and navigate to different pages. 
                     For each step, you will think about which actions you should preform to complete the task. You will give a short rationalization for the immediate action to perform. You will then return one of the following JSON commands:
 
-                    1. {{"action": "CLICK", "selector": "label number to click", "rationale": "this button will allow me to navigate to the apple product page"}} - click on a link, button, or input that has the associated blue label number in the image
-                    2. {{"action": "TYPE", "selector": "label number to click", "value": "apple", "rationale": "i must type my username in this input to login to put the apple in the cart"}} - type text 'apple' into an input that has the associated blue label number. Use this only if you don't want to submit right after typing.
-                    3. {{"action": "TYPE_AND_SUBMIT", "selector": "label number to click", value: "apple", "rationale": "typing 'apple' into the searchbar will allow me to find the apple selection"}} - type text 'apple' into an input with the associated blue label number and press enter
-                    4. {{"action": "GO_BACK", "rationale": "it looks like this page doesn't have what I'm looking for. I should backtrack"}} - go back to the previous page
-                    5. {{"action": "SCROLL_UP", "rationale": "I see an apple near the bottom of the page but can't select it yet"}} - scroll down the 3/4ths of the page
-                    6. {{"action": "SCROLL_DOWN", "rationale": "I have scrolled down but now must press the cart button at the top of the page"}} - scroll up the 3/4ths of the page
-                    7. {{"action": "END", "rationale": "I have succesfully added the apple to the cart and enteblue payment information"}} - indicate you've successfully completed the task
+                    1. {{"action": "CLICK", "goal": "This button will allow me to navigate to the apple product page", "selector": "label number to click"}} - click on a link, button, or input that has the associated blue label number in the image
+                    2. {{"action": "TYPE", "goal": "I must type my username in this input to login to put the apple in the cart", "selector": "label number to click", "value": "apple"}} - type text 'apple' into an input that has the associated blue label number. Use this only if you don't want to submit right after typing.
+                    3. {{"action": "TYPE_AND_SUBMIT", "goal": "typing 'apple' into the searchbar will allow me to find the apple selection", "selector": "label number to click", value: "apple"}} - type text 'apple' into an input with the associated blue label number and press enter
+                    4. {{"action": "GO_BACK", "goal": "it looks like this page doesn't have what I'm looking for. I should backtrack"}} - go back to the previous page
+                    5. {{"action": "SCROLL_UP", "goal": "I see an apple near the bottom of the page but can't select it yet"}} - scroll down the 3/4ths of the page
+                    6. {{"action": "SCROLL_DOWN", "goal": "I have scrolled down but now must press the cart button at the top of the page"}} - scroll up the 3/4ths of the page
+                    7. {{"action": "END", "goal": "I have succesfully added the apple to the cart and enteblue payment information"}} - indicate you've successfully completed the task
 
                     Based on the following task, return ONLY THE JSON in the exact provided format above. Do not return anything beyond JSON. Do not return an action that is not "CLICK", "TYPE", "TYPE_AND_SUBMIT", "GO_BACK", "SCROLL_UP", "SCROLL_DOWN", or "END". Any deviation will cause the system to fail.
 
                     Here is your task: {self.prompt}
 
-                    For guidance, here is the history of your past rationale for the actions you have already tried: {self.past_commands}
+                    For guidance, here is the history of your past goals for the actions you have already tried: {self.past_commands}
                     """
                 },
                 {
@@ -194,9 +207,9 @@ class Agent:
                 self.get_page_info(page, screenshot_path)
                 self.encode_image(screenshot_path)
                 response = self.get_gpt_command()
-                command, selector, value, rationale = response["action"], response.get("selector", ""), str(response.get("value", "")), response.get("rationale", "")
-                self.past_commands.append("command: " + command + ", selector: " + selector + ", value: " + value + ", rationale: " + rationale)
-                print("taking action with command:", command + ", selector:", selector + ", and value:", value + ", rationale:", rationale)
+                command, selector, value, goal = response["action"], response.get("selector", ""), str(response.get("value", "")), response.get("goal", "")
+                self.past_commands.append("command: " + command + ", value: " + value + ", goal: " + goal)
+                print("taking action with command:", command + ", selector:", selector + ", and value:", value + ", goal:", goal)
                 self.clear_page_info(page)
                 self.perform_action(command, selector, value)
                 if command == "END":
