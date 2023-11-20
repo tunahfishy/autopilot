@@ -11,6 +11,7 @@ def scroll_down(page):
 def click_element(page, selector):
     page.eval_on_selector(selector, 'element => element.style.border = "3px solid red"')
     page.click(selector)
+    page.wait_for_timeout(2000)
 
 def type(page, selector, text):
     page.fill(selector, text)
@@ -21,3 +22,15 @@ def type_and_submit(page, selector, text):
 
 def go_back(page):
     page.go_back()
+
+def end(page):
+    # Celebrate with a confetti animation before closing the page
+    page.evaluate("""
+        let confettiElement = document.createElement('div');
+        confettiElement.innerHTML = '<div class="confetti"></div>';
+        document.body.appendChild(confettiElement);
+        setTimeout(() => {
+            document.body.removeChild(confettiElement);
+        }, 2000);
+    """)
+    page.close()
