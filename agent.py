@@ -61,19 +61,19 @@ class Agent:
                 if (inViewport && isVisible) {{
                     let selector = element.tagName.toLowerCase();
                     for (const attr of element.attributes) {{
-                        if (attr.name !== "style") {{
+                        if (attr.name !== "style" && attr.name !== "class") {{
                             selector += `[${{attr.name}}="${{attr.value}}"]`;
                         }} 
                     }}
                     result[index] = selector;
-                    element.style.border = "1px solid red";
+                    element.style.border = "1px solid blue";
                     const label = document.createElement("span");
                     label.className = "autopilot-generated-label";
                     label.textContent = index;
                     label.style.position = "absolute";
                     label.style.top = rect.top + "px";
                     label.style.left = rect.left + "px";
-                    label.style.color = "red";
+                    label.style.color = "blue";
                     label.style.zIndex = 10000;
                     document.body.appendChild(label);
                 }}
@@ -105,13 +105,13 @@ class Agent:
                     You are on the page shown in this image. You will be provided with a task that will require you to interact with the browser and navigate to different pages. 
                     For each step, you will think about which actions you should preform to complete the task. You will give a short rationalization for the immediate action to perform. You will then return one of the following JSON commands:
 
-                    1. {{"action": "CLICK", "selector": "label number to click", "rationale": "this button will allow me to navigate to the apple product page"}} - click on a link, button, or input that has the associated red label number
-                    2. {{"action": "TYPE", "selector": "label number to click", "value": "apple", "rationale": "i must type my username in this input to login to put the apple in the cart"}} - type text 'apple' into an input that has the associated red label number. Use this only if you don't want to submit right after typing.
-                    3. {{"action": "TYPE_AND_SUBMIT", "selector": "label number to click", value: "apple", "rationale": "typing 'apple' into the searchbar will allow me to find the apple selection"}} - type text 'apple' into an input with the associated red label number and press enter
-                    4. {{"action": "GO_BACK", value: "", "rationale": "it looks like this page doesn't have what I'm looking for. I should backtrack"}} - go back to the previous page
+                    1. {{"action": "CLICK", "selector": "label number to click", "rationale": "this button will allow me to navigate to the apple product page"}} - click on a link, button, or input that has the associated blue label number in the image
+                    2. {{"action": "TYPE", "selector": "label number to click", "value": "apple", "rationale": "i must type my username in this input to login to put the apple in the cart"}} - type text 'apple' into an input that has the associated blue label number. Use this only if you don't want to submit right after typing.
+                    3. {{"action": "TYPE_AND_SUBMIT", "selector": "label number to click", value: "apple", "rationale": "typing 'apple' into the searchbar will allow me to find the apple selection"}} - type text 'apple' into an input with the associated blue label number and press enter
+                    4. {{"action": "GO_BACK", "rationale": "it looks like this page doesn't have what I'm looking for. I should backtrack"}} - go back to the previous page
                     5. {{"action": "SCROLL_UP", "rationale": "I see an apple near the bottom of the page but can't select it yet"}} - scroll down the 3/4ths of the page
                     6. {{"action": "SCROLL_DOWN", "rationale": "I have scrolled down but now must press the cart button at the top of the page"}} - scroll up the 3/4ths of the page
-                    7. {{"action": "END", "value": "", "rationale": "I have succesfully added the apple to the cart and entered payment information"}} - indicate you've successfully completed the task
+                    7. {{"action": "END", "rationale": "I have succesfully added the apple to the cart and enteblue payment information"}} - indicate you've successfully completed the task
 
                     Based on the following task, return ONLY THE JSON in the exact provided format above. Do not return anything beyond JSON. Do not return an action that is not "CLICK", "TYPE", "TYPE_AND_SUBMIT", "GO_BACK", "SCROLL_UP", "SCROLL_DOWN", or "END". Any deviation will cause the system to fail.
 
@@ -141,9 +141,7 @@ class Agent:
     # can use match case if python3.10
     def select_action(self, command: str, selector: str, value:str):
         if selector: 
-            print("Selector key:", selector)
             selector = self.elements[selector]
-            print("Selector:", selector)
 
         if command == "CLICK":
             print("Clicking on element with selector", selector)

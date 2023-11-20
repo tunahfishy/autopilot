@@ -20,7 +20,11 @@ if __name__ == "__main__":
             print("Error while deleting file : ", filePath)
 
     agent = Agent(OpenAI(api_key=os.getenv("OPENAI_API_KEY")))
-    agent.complete_task(user_prompt)
+    try: 
+        agent.complete_task(user_prompt)
+    except KeyboardInterrupt:
+        print("Keyboard Interrupt, exiting gracefully...")
+        # agent.close()
 
  
 
