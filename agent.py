@@ -39,6 +39,7 @@ class Agent:
                 label.remove();
             }});
         }}''')
+        page.wait_for_timeout(2000)
         
     def get_page_info(self, page, save_path: str):
         print("Annotating", self.url, "...")
@@ -116,7 +117,7 @@ class Agent:
 
                     Here is your task: {self.prompt}
 
-                    Here is the history of your past rationale for the actions you have already tried: {self.past_commands}
+                    For guidance, here is the history of your past rationale for the actions you have already tried: {self.past_commands}
                     """
                 },
                 {
@@ -135,7 +136,6 @@ class Agent:
         responseData = response.choices[0].message.content
         if responseData[0] != "{":
             responseData = responseData[responseData.index("{"):responseData.rindex("}")+1]
-        print("returned", responseData)
         return json.loads(responseData)
 
     # can use match case if python3.10
