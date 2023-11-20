@@ -18,10 +18,10 @@ class Agent:
     def set_image(self, base64_image):
         self.base64_image = base64_image
 
-    def set_prompt(self, prompt):
+    def set_prompt(self, prompt: str):
         self.prompt = prompt
 
-    def encode_image(self, image_path):
+    def encode_image(self, image_path: str):
         with open(image_path, "rb") as image_file:
             image = base64.b64encode(image_file.read()).decode('utf-8')
             self.base64_image = image
@@ -40,7 +40,7 @@ class Agent:
             }});
         }}''')
         
-    def get_page_info(self, page, save_path='screenshot.png'):
+    def get_page_info(self, page, save_path: str):
         print("Annotating", self.url, "...")
         element_info = page.evaluate(f'''() => {{
             const elements = Array.from(document.querySelectorAll("a, button, input"));
@@ -85,7 +85,7 @@ class Agent:
         self.elements = element_info
         
         # Save to JSON file
-        with open('element_info.json', 'w') as f:
+        with open(f'elements/{self.iterations}.json', 'w') as f:
             json.dump(self.elements, f, indent=4)
             
         return element_info
@@ -102,19 +102,21 @@ class Agent:
                     "type": "text", 
                     "text": f"""You are an agent controlling a browser. 
                     You are on the page shown in this image. You will be provided with a task that will require you to interact with the browser and navigate to different pages. 
-                    For each step, you will think about which actions you should preform to complete the task. You will return one of the following JSON commands:
+                    For each step, you will think about which actions you should preform to complete the task. You will give a short rationalization for the immediate action to perform. You will then return one of the following JSON commands:
 
-                    1. {{"action": "CLICK", "selector": "label number to click"}} - click on a link, button, or input that has the associated red label number
-                    2. {{"action": "TYPE", "selector": "label number to click", "value": "apple"}} - type text 'apple' into an input that has the associated red label number. Use this only if you don't want to submit right after typing.
-                    3. {{"action": "TYPE_AND_SUBMIT", "selector": "label number to click", value: "apple"}} - type text 'apple' into an input with the associated red label number and press enter
-                    4. {{"action": "GO_BACK", value: ""}} - go back to the previous page
-                    5. {{"action": "END", "value": ""}} - indicate you've successfully completed the task
+                    1. {{"action": "CLICK", "selector": "label number to click", "rationale": "this button will allow me to navigate to the apple product page"}} - click on a link, button, or input that has the associated red label number
+                    2. {{"action": "TYPE", "selector": "label number to click", "value": "apple", "rationale": "i must type my username in this input to login to put the apple in the cart"}} - type text 'apple' into an input that has the associated red label number. Use this only if you don't want to submit right after typing.
+                    3. {{"action": "TYPE_AND_SUBMIT", "selector": "label number to click", value: "apple", "rationale": "typing 'apple' into the searchbar will allow me to find the apple selection"}} - type text 'apple' into an input with the associated red label number and press enter
+                    4. {{"action": "GO_BACK", value: "", "rationale": "it looks like this page doesn't have what I'm looking for. I should backtrack"}} - go back to the previous page
+                    5. {{"action": "SCROLL_UP", "rationale": "I see an apple near the bottom of the page but can't select it yet"}} - scroll down the 3/4ths of the page
+                    6. {{"action": "SCROLL_DOWN", "rationale": "I have scrolled down but now must press the cart button at the top of the page"}} - scroll up the 3/4ths of the page
+                    7. {{"action": "END", "value": "", "rationale": "I have succesfully added the apple to the cart and entered payment information"}} - indicate you've successfully completed the task
 
-                    Based on the following task, return ONLY THE JSON in the exact provided format above. Do not return anything beyond JSON. Do not return an action that is not "CLICK", "TYPE", "TYPE_AND_SUBMIT", "GO_BACK", OR "END". Any deviation will cause the system to fail.
+                    Based on the following task, return ONLY THE JSON in the exact provided format above. Do not return anything beyond JSON. Do not return an action that is not "CLICK", "TYPE", "TYPE_AND_SUBMIT", "GO_BACK", "SCROLL_UP", "SCROLL_DOWN", or "END". Any deviation will cause the system to fail.
 
                     Here is your task: {self.prompt}
 
-                    Here is the history of the commands you have already tried: {self.past_commands}
+                    Here is the history of your past rationale for the actions you have already tried: {self.past_commands}
                     """
                 },
                 {
@@ -137,8 +139,7 @@ class Agent:
         return json.loads(responseData)
 
     # can use match case if python3.10
-    def select_action(self, command, selector, value):
-        print(command, selector, value)
+    def select_action(self, command: str, selector: str, value:str):
         if selector: 
             print("Selector key:", selector)
             selector = self.elements[selector]
@@ -156,6 +157,12 @@ class Agent:
         elif command == "GO_BACK":
             print("Going back...")
             return go_back(self.page)
+        elif command == "SCROLL_UP":
+            print("Scrolling up...")
+            return scroll_up(self.page)
+        elif command == "SCROLL_DOWN":
+            print("Scrolling down...")
+            return scroll_down(self.page)
         elif command == "END":
             print("Ending task...")
             return end(self.page)
@@ -164,7 +171,7 @@ class Agent:
             return None
 
     # click for now
-    def perform_action(self, action, selector, value):
+    def perform_action(self, action: str, selector: str, value: str):
         print("Performing action...", action)
         try: 
             self.select_action(action, selector, value)
@@ -172,9 +179,9 @@ class Agent:
             print("Error: could not perform action. Error details:", str(e))
 
 
-    def complete_task(self, prompt):
+    def complete_task(self, prompt: str):
         self.set_prompt(prompt)
-        # sample prompt: Help me buy an apple
+        # sample prompt: Help me buy an apple fruit
         with sync_playwright() as playwright:
             chromium = playwright.chromium
             browser = chromium.launch(headless=False)
@@ -184,13 +191,14 @@ class Agent:
             self.page = page
 
             while True:
-                print("Iteration", self.iterations)
-                self.get_page_info(page)
-                self.encode_image("screenshot.png")
+                print(self.name, "is on iteration", self.iterations)
+                screenshot_path = f'screenshots/{self.iterations}.png'
+                self.get_page_info(page, screenshot_path)
+                self.encode_image(screenshot_path)
                 response = self.get_gpt_command()
-                command, selector, value = response["action"], response.get("selector", ""), str(response.get("value", ""))
-                self.past_commands.append("command: " + command + ", selector: " + selector + ", value: " + value)
-                print("taking action with command:", command + ", selector:", selector + ", and value:", value)
+                command, selector, value, rationale = response["action"], response.get("selector", ""), str(response.get("value", "")), response.get("rationale", "")
+                self.past_commands.append("command: " + command + ", selector: " + selector + ", value: " + value + ", rationale: " + rationale)
+                print("taking action with command:", command + ", selector:", selector + ", and value:", value + ", rationale:", rationale)
                 self.clear_page_info(page)
                 self.perform_action(command, selector, value)
                 if command == "END":
