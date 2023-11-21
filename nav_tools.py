@@ -12,7 +12,7 @@ def scroll_down(page):
 
 def click_element(page, selector):
     page.eval_on_selector(selector, 'element => element.style.border = "3px solid red"')
-    page.click(selector)
+    page.click(selector, force=True)
     page.wait_for_timeout(2000)
 
 def type(page, selector, text):

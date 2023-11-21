@@ -11,6 +11,7 @@ class Agent:
         self.url = "https://amazon.com/"
         self.page = None
         self.base64_image = None
+        self.base64_image_annotated = None
         self.elements = {}
         self.iterations = 0
         self.past_commands = ["START"]
@@ -21,11 +22,13 @@ class Agent:
     def set_prompt(self, prompt: str):
         self.prompt = prompt
 
-    def encode_image(self, image_path: str):
+    def encode_images(self, image_path: str):
         with open(image_path, "rb") as image_file:
             image = base64.b64encode(image_file.read()).decode('utf-8')
             self.base64_image = image
-            return image 
+        with open(image_path + ".annotated.png", "rb") as image_file:
+            annotated_image = base64.b64encode(image_file.read()).decode('utf-8')
+            self.base64_image_annotated = annotated_image
         
     def clear_page_info(self, page):
         print("Clearing page info...")
@@ -43,6 +46,7 @@ class Agent:
         
     def get_page_info(self, page, save_path: str):
         print("Annotating", self.url, "...")
+        page.screenshot(path=save_path)
         element_info = page.evaluate(f'''() => {{
             const elements = Array.from(document.querySelectorAll("a, button, input"));
             let result = {{}};
@@ -94,7 +98,7 @@ class Agent:
             return result;
         }}''')
         page.wait_for_timeout(2000)
-        page.screenshot(path=save_path)
+        page.screenshot(path=save_path + ".annotated.png")
 
         self.elements = element_info
         
@@ -114,31 +118,36 @@ class Agent:
             "content": [
                 {
                     "type": "text", 
-                    "text": f"""You are an agent controlling a browser. 
-                    You are on the page shown in this image. You will be provided with a task that will require you to interact with the browser and navigate to different pages. 
-                    For each step, you will think about which actions you should preform to complete the task. You will give a short rationalization for the immediate action to perform. You will then return one of the following JSON commands:
+                    "text": f"""You are an intelligent agent controlling a browser with the following end goal: {self.prompt}.
+                    You are on the page shown in these images. The first image is the page and the second is an annotated version that will help you select elements on the page. You will be provided with a task that will require you to interact with the browser and navigate to different pages. 
+                    For each step, you will first try to understand the current page that you are on. Then you will think about your goal at the current step to help you achieve the end goal, which of the seven actions you can take to help you achieve this goal, and which element will help you perform this immediate action. You will then return this output in the format of one of the following JSON commands:
 
-                    1. {{"action": "CLICK", "goal": "This button will allow me to navigate to the apple product page", "selector": "label number to click"}} - click on a link, button, or input that has the associated blue label number in the image
+                    1. {{"action": "CLICK", "goal": "This image of an apple will allow me to navigate to its purchase page", "selector": "label number to click"}} - click on a link, button, or input that has the associated blue label number in the image
                     2. {{"action": "TYPE", "goal": "I must type my username in this input to login to put the apple in the cart", "selector": "label number to click", "value": "apple"}} - type text 'apple' into an input that has the associated blue label number. Use this only if you don't want to submit right after typing.
                     3. {{"action": "TYPE_AND_SUBMIT", "goal": "typing 'apple' into the searchbar will allow me to find the apple selection", "selector": "label number to click", value: "apple"}} - type text 'apple' into an input with the associated blue label number and press enter
-                    4. {{"action": "GO_BACK", "goal": "it looks like this page doesn't have what I'm looking for. I should backtrack"}} - go back to the previous page
-                    5. {{"action": "SCROLL_UP", "goal": "I see an apple near the bottom of the page but can't select it yet"}} - scroll down the 3/4ths of the page
-                    6. {{"action": "SCROLL_DOWN", "goal": "I have scrolled down but now must press the cart button at the top of the page"}} - scroll up the 3/4ths of the page
+                    4. {{"action": "GO_BACK", "goal": "I've clicked the same button multiple times and it looks like this page doesn't have what I'm looking for. I should backtrack"}} - go back to the previous page
+                    5. {{"action": "SCROLL_DOWN", "goal": "I'm on the apple product page but I don't see the checkout button, I assume it is further down the page."}} - scroll down the 3/4ths of the page
+                    6. {{"action": "SCROLL_UP", "goal": "I have scrolled down but now must press the cart button at the top of the page"}} - scroll up the 3/4ths of the page
                     7. {{"action": "END", "goal": "I have succesfully added the apple to the cart and enteblue payment information"}} - indicate you've successfully completed the task
 
                     Based on the following task, return ONLY THE JSON in the exact provided format above. Do not return anything beyond JSON. Do not return an action that is not "CLICK", "TYPE", "TYPE_AND_SUBMIT", "GO_BACK", "SCROLL_UP", "SCROLL_DOWN", or "END". Any deviation will cause the system to fail.
 
-                    Here is your task: {self.prompt}
-
-                    For guidance, here is the history of your past goals for the actions you have already tried: {self.past_commands}
+                    For guidance, here is the history of your past goals for the actions you have already tried. This should prevent you from repeating actions that don't work: {self.past_commands}
                     """
                 },
                 {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{self.base64_image}",
-                    "detail": "auto"
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{self.base64_image}",
+                        "detail": "auto"
+                    },
                 },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{self.base64_image_annotated}",
+                        "detail": "auto"
+                    },
                 },
             ],
             }
@@ -205,7 +214,7 @@ class Agent:
                 print(self.name, "is on iteration", self.iterations)
                 screenshot_path = f'screenshots/{self.iterations}.png'
                 self.get_page_info(page, screenshot_path)
-                self.encode_image(screenshot_path)
+                self.encode_images(screenshot_path)
                 response = self.get_gpt_command()
                 command, selector, value, goal = response["action"], response.get("selector", ""), str(response.get("value", "")), response.get("goal", "")
                 self.past_commands.append("command: " + command + ", value: " + value + ", goal: " + goal)
