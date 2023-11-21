@@ -17,7 +17,8 @@ class Agent:
         self.page = None
         self.base64_image = None
         self.base64_image_annotated = None
-        self.elements = {}
+        self.label_selectors = {}
+        self.label_simplified_htmls = {}
         self.iterations = 0
         self.past_commands = ["START"]
 
@@ -49,12 +50,14 @@ class Agent:
         }}''')
         page.wait_for_timeout(2000)
         
+    # get's initial and annotated sreenshots, finds html of all interactable elemtns 
     def get_page_info(self, page, save_path: str):
         print("Annotating", self.page.url, "...")
         page.screenshot(path=save_path)
-        element_info = page.evaluate(f'''() => {{
-            const elements = Array.from(document.querySelectorAll("a, button, input"));
-            let result = {{}};
+        label_selectors, label_simplified_htmls = page.evaluate(f'''() => {{
+            const elements = Array.from(document.querySelectorAll("a, button, input, textarea, select"));
+            let label_selectors = {{}};
+            let label_simplified_htmls = {{}};
             function isHiddenByAncestors(element) {{
                 while (element) {{
                     const style = window.getComputedStyle(element);
@@ -79,12 +82,17 @@ class Agent:
 
                 if (inViewport && isVisible && !isHiddenByAncestors(element)) {{
                     let selector = element.tagName.toLowerCase();
+                    let html = element.cloneNode(true);
+                    html.innerHTML = '';
+                    let simplified_html = html.outerHTML;
                     for (const attr of element.attributes) {{
                         if (attr.name !== "style" && attr.name !== "class") {{
                             selector += `[${{attr.name}}="${{attr.value}}"]`;
                         }} 
                     }}
-                    result[index] = selector;
+                    label_selectors[index] = selector;
+                    label_simplified_htmls[index] = simplified_html;
+                    result[index] = (selector, element.outerHTML);
                     element.style.border = "2px solid brown";
                     const label = document.createElement("span");
                     label.className = "autopilot-generated-label";
@@ -102,18 +110,21 @@ class Agent:
                     document.body.appendChild(label);
                 }}
             }});
-            return result;
+            return [label_selectors, label_simplified_htmls];
         }}''')
         page.wait_for_timeout(2000)
         page.screenshot(path=save_path + ".annotated.png")
 
-        self.elements = element_info
-        
+        self.label_selectors = label_selectors, 
+        self.label_simplified_htmls = label_simplified_htmls
+        print(label_simplified_htmls)
+        print(label_selectors)
+
         # Save to JSON file
-        with open(f'elements/{self.iterations}.json', 'w') as f:
-            json.dump(self.elements, f, indent=4)
-            
-        return element_info
+        with open(f'element_selectors/{self.iterations}.json', 'w') as f:
+            json.dump(self.label_selectors, f, indent=4)
+        with open(f'elements_htmls/{self.iterations}.json', 'w') as f:
+            json.dump(self.label_simplified_htmls, f, indent=4)
 
     def get_gpt_command(self):
         print("Generating command...")
@@ -129,14 +140,14 @@ class Agent:
                     BACKGROUND:
                     Your end goal is the following: {self.prompt}
 
-                    You are currently on a specific page of {get_base_url(self.page.url)}, which shown in the image. The image is an annotated version of your current page, with bounding boxes drawn around each element that you can interact with. At the top left of the bounding box is a number that corresponds to the label of the element. If an element doesn't have a bounding box around it, you cannot interact with it.
+                    You are currently on a specific page of {get_base_url(self.page.url)}, which shown in the image. The image is an annotated version of your current page, with bounding boxes drawn around each element that you can interact with. At the top left of the bounding box is a number that corresponds to the label of the element. If an element doesn't have a bounding box around it, you cannot interact with it. You will also be provided the simplified html of each of these elements.
 
                     Here are the following actions you can take on a page:
                     - CLICK: click a specific element on the page
                     - SCROLL_DOWN: scroll down on the page
                     - SCROLL_UP: scroll up on the page
-                    - TYPE: type text into a text input
-                    - TYPE_AND_SUBMIT: : type text into a text input and press enter
+                    - TYPE: type text into a text input or textarea
+                    - TYPE_AND_SUBMIT: type text into a text input or textarea and press enter
                     - GO_BACK: go back to the previous page
                     - END: declare that you have completed the task
                     
@@ -148,11 +159,11 @@ class Agent:
                     1. Have you achieved your end goal? 
                         - If not, what is the next step you might need to take to get closer to your end goal? 
                         - If you have achieved your end goal, skip to step 8 and output {{"action": "END"}}.
-                    2. Describe the elements you see in the image. Do not infer what else may be on rest of the page. 
+                    2. Describe the elements you see in the image. Look at the simplified HTML associated with each page to ensure you are correctly interpreting the labeled elements: {self.label_simplified_htmls} Do not infer what else may be on rest of the page. 
                         - What on this image could be helpful in getting closer to the end goal?
                         - What do you predict would happen if you interacted with these elements?
                     3. What might be on the page that is not currently showing but could appear via scrolling? How would these be helpful in getting closer to the end goal?
-                    4. Which of the elements you described in step 1 or 2 would be the best to interact with to help you achieve your goal? Is this element currently visible on the page?
+                    4. Which of the elements you described in step 1 or 2 would be the best to interact with to help you achieve your goal? Is this element currently labeled and visible on the page?
                     5. Based on the elements you described in step 3, determine whether to scroll or not.
                     6. If you need to scroll, determine whether to scroll up or down. 
                     7. If you don't need to scroll, visually describe the element you will interact with to help you achieve your goal. Then, identify the label number of this element in the image. What action will you take on this element?
@@ -197,7 +208,7 @@ class Agent:
     def select_action(self, command: str, label: int, value:str):
         if label: 
             label = str(label)
-            label = self.elements[label]
+            label = self.label_selectors[label]
 
         if command == "CLICK":
             print("Clicking on element with label", label)
@@ -231,7 +242,7 @@ class Agent:
             print("Error: could not perform action. Error details:", str(e), ". Trying again.")
 
     def update_commands_and_narrate(self, response):
-        command, label, value, goal = response["action"], str(response.get("label", "")), str(response.get("value", "")), response.get("goal", "")
+        command, label, value = response["action"], str(response.get("label", "")), str(response.get("value", "")), response.get("goal", "")
         action_details = "taking action with command: " + command
         if label:
             action_details += ", label: " + label

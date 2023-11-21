@@ -12,7 +12,8 @@ if __name__ == "__main__":
     # sample prompt: Help me buy an apple fruit
 
     # clear the elements and screenshots folders
-    fileList = glob.glob('./elements/*')
+    fileList = glob.glob('./element_htmls/*')
+    fileList += glob.glob('./element_selectors/*')
     fileList += glob.glob('./screenshots/*')
     for filePath in fileList:
         try:
