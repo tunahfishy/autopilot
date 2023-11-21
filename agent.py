@@ -13,7 +13,7 @@ class Agent:
         self.name = "Bot"
         self.prompt = ""
         self.client = client
-        self.url = "https://amazon.com/"
+        self.starting_url = "https://amazon.com/"
         self.page = None
         self.base64_image = None
         self.base64_image_annotated = None
@@ -50,7 +50,7 @@ class Agent:
         page.wait_for_timeout(2000)
         
     def get_page_info(self, page, save_path: str):
-        print("Annotating", self.url, "...")
+        print("Annotating", self.page.url, "...")
         page.screenshot(path=save_path)
         element_info = page.evaluate(f'''() => {{
             const elements = Array.from(document.querySelectorAll("a, button, input"));
@@ -78,13 +78,13 @@ class Agent:
                 );
 
                 if (inViewport && isVisible && !isHiddenByAncestors(element)) {{
-                    let selector = element.tagName.toLowerCase();
+                    let label = element.tagName.toLowerCase();
                     for (const attr of element.attributes) {{
                         if (attr.name !== "style" && attr.name !== "class") {{
-                            selector += `[${{attr.name}}="${{attr.value}}"]`;
+                            label += `[${{attr.name}}="${{attr.value}}"]`;
                         }} 
                     }}
-                    result[index] = selector;
+                    result[index] = label;
                     element.style.border = "1px solid blue";
                     const label = document.createElement("span");
                     label.className = "autopilot-generated-label";
@@ -183,19 +183,19 @@ class Agent:
         return json.loads(responseData)
 
     # can use match case if python3.10
-    def select_action(self, command: str, selector: str, value:str):
-        if selector: 
-            selector = self.elements[selector]
+    def select_action(self, command: str, label: str, value:str):
+        if label: 
+            label = self.elements[label]
 
         if command == "CLICK":
-            print("Clicking on element with selector", selector)
-            return click_element(self.page, selector)
+            print("Clicking on element with label", label)
+            return click_element(self.page, label)
         elif command == "TYPE":
-            print("Typing...", value, selector)
-            return type(self.page, selector, value)
+            print("Typing...", value, label)
+            return type(self.page, label, value)
         elif command == "TYPE_AND_SUBMIT":
-            print("Typing and submitting...", value, selector)
-            return type_and_submit(self.page, selector, value)
+            print("Typing and submitting...", value, label)
+            return type_and_submit(self.page, label, value)
         elif command == "GO_BACK":
             print("Going back...")
             return go_back(self.page)
@@ -212,14 +212,24 @@ class Agent:
             print("Invalid command")
             return None
 
-    # click for now
-    def perform_action(self, action: str, selector: str, value: str):
-        print("Performing action...", action)
+    def perform_action(self, action: str, label: str, value: str):
         try: 
-            self.select_action(action, selector, value)
+            self.select_action(action, label, value)
         except Exception as e:
-            print("Error: could not perform action. Error details:", str(e))
+            print("Error: could not perform action. Error details:", str(e), ". Trying again.")
 
+    def update_commands_and_narrate(self, response):
+        command, label, value, goal = response["action"], response.get("label", ""), str(response.get("value", "")), response.get("goal", "")
+        action_details = "taking action with command: " + command
+        if label:
+            action_details += ", label: " + label
+        if value:
+            action_details += ", value: " + value
+        action_details += ", and goal: " + goal
+
+        self.past_commands.append(action_details)
+        print(action_details)
+        return command, label, value
 
     def complete_task(self, prompt: str):
         self.set_prompt(prompt)
@@ -229,25 +239,20 @@ class Agent:
             browser = chromium.launch(headless=False)
             page = browser.new_page()
             page.set_viewport_size({"width": page.viewport_size["width"], "height": page.viewport_size["height"]})
-            page.goto(self.url)
+            page.goto(self.starting_url)
             self.page = page
 
             while True:
-                print(self.name, "is on iteration", self.iterations)
+                print("🤖", self.name, "is on iteration", self.iterations)
                 screenshot_path = f'screenshots/{self.iterations}.png'
                 self.get_page_info(page, screenshot_path)
                 self.encode_images(screenshot_path)
                 response = self.get_gpt_command()
-                command, selector, value, goal = response["action"], response.get("selector", ""), str(response.get("value", "")), response.get("goal", "")
-                self.past_commands.append("command: " + command + ", value: " + value + ", goal: " + goal)
-                print("taking action with command:", command + ", selector:", selector + ", and value:", value + ", goal:", goal)
+                command, label, value = self.update_commands_and_narrate(response)
                 self.clear_page_info(page)
-                self.perform_action(command, selector, value)
+                self.perform_action(command, label, value)
                 if command == "END":
                     print("Task completed after", self.iterations, "iterations!")
                     break
                 self.iterations += 1
-                print()
-
-
-        
+                print()       

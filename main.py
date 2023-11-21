@@ -7,7 +7,8 @@ from openai import OpenAI
 load_dotenv()
 
 if __name__ == "__main__":
-    user_prompt = input("Please enter a prompt: ")
+    user_prompt = input("🤖 Bot: What would you like me to do? ")
+    print()
     # sample prompt: Help me buy an apple fruit
 
     # clear the elements and screenshots folders
@@ -24,7 +25,6 @@ if __name__ == "__main__":
         agent.complete_task(user_prompt)
     except KeyboardInterrupt:
         print("Keyboard Interrupt, exiting gracefully...")
-        # agent.close()
 
  
 
