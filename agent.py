@@ -78,14 +78,14 @@ class Agent:
                 );
 
                 if (inViewport && isVisible && !isHiddenByAncestors(element)) {{
-                    let label = element.tagName.toLowerCase();
+                    let selector = element.tagName.toLowerCase();
                     for (const attr of element.attributes) {{
                         if (attr.name !== "style" && attr.name !== "class") {{
-                            label += `[${{attr.name}}="${{attr.value}}"]`;
+                            selector += `[${{attr.name}}="${{attr.value}}"]`;
                         }} 
                     }}
-                    result[index] = label;
-                    element.style.border = "1px solid blue";
+                    result[index] = selector;
+                    element.style.border = "1px solid brown";
                     const label = document.createElement("span");
                     label.className = "autopilot-generated-label";
                     label.textContent = index;
@@ -95,7 +95,7 @@ class Agent:
                     label.style.left = (window.scrollX + rect.left) + "px"; 
                     label.style.color = "white";
                     label.style.fontWeight = "bold";
-                    label.style.backgroundColor = "blue";
+                    label.style.backgroundColor = "brown";
                     label.style.zIndex = 10000;
                     document.body.appendChild(label);
                 }}
@@ -127,7 +127,7 @@ class Agent:
                     BACKGROUND:
                     Your end goal is the following: {self.prompt}
 
-                    You are currently on a specific page of {get_base_url(self.page.url())}, which shown in the first image. The second image is an annotated version of your current page, highlighting the elements that you can interact with. 
+                    You are currently on a specific page of {get_base_url(self.page.url)}, which shown in the first image. The second image is an annotated version of your current page, highlighting the elements that you can interact with. 
 
                     Here are the following actions you can take on a page:
                     - CLICK: click a specific element on the page
@@ -140,12 +140,15 @@ class Agent:
                     
 
                     TASK:
-                    Complete steps 1-5, showing your work for each step. Be detailed in your reasoning and answer all questions. Completing these steps will help you achieve your end goal.
-
+                    Complete steps 1-8, showing your work for each step. Be detailed in your reasoning and answer all questions. Completing these steps will help you achieve your end goal.
 
                     TASK STEPS:
-                    1. Have you achieved your end goal? If not, what is the next step you might need to take to get closer to your end goal? If you have achieved your end goal, skip to step 8 and output {{"action": "END"}}.
-                    2. Describe what you see on the current page you are on. What on this page could be helpful in getting closer to the end goal? What do you predict would happen if you interacted with these elements?
+                    1. Have you achieved your end goal? 
+                        - If not, what is the next step you might need to take to get closer to your end goal? 
+                        - If you have achieved your end goal, skip to step 8 and output {{"action": "END"}}.
+                    2. Describe what you see on the current page you are on. Only describe visible elements. Do not infer what else may be on rest of the page. 
+                        - What on this page could be helpful in getting closer to the end goal?
+                        - What do you predict would happen if you interacted with these elements?
                     3. What might be on the page that is not currently showing but could appear via scrolling? How would these be helpful in getting closer to the end goal?
                     4. Which of the elements you described in step 1 or 2 would be the best to interact with to help you achieve your goal? Is this element currently visible on the page?
                     5. Based on the elements you described in step 3, determine whether to scroll or not.
@@ -155,26 +158,30 @@ class Agent:
                         - If you are scrolling or going back, output a JSON command in the following format: {{"action": ACTION}}
                         - If you are clicking, output a JSON command in the following format: {{"action": ACTION, "label": LABEL_NUMBER}}
                         - If you are typing, output a JSON command in the following format: {{"action": ACTION, "label": LABEL_NUMBER, "value": "TEXT_TO_TYPE"}}
+
+                    REMEMBER:
+                    Complete all the steps 1-8, showing your work for each step.
                     """
                 },
                 {
                     "type": "image_url",
                     "image_url": {
                         "url": f"data:image/jpeg;base64,{self.base64_image}",
-                        "detail": "auto"
+                        "detail": "high"
                     },
                 },
                 {
                     "type": "image_url",
                     "image_url": {
                         "url": f"data:image/jpeg;base64,{self.base64_image_annotated}",
-                        "detail": "auto"
+                        "detail": "high"
                     },
                 },
             ],
             }
         ],
-        max_tokens=300,
+        max_tokens=4096,
+        # temperature=0.0,
         )
 
         responseData = response.choices[0].message.content
@@ -185,8 +192,9 @@ class Agent:
         return json.loads(responseData)
 
     # can use match case if python3.10
-    def select_action(self, command: str, label: str, value:str):
+    def select_action(self, command: str, label: int, value:str):
         if label: 
+            label = str(label)
             label = self.elements[label]
 
         if command == "CLICK":
@@ -221,13 +229,12 @@ class Agent:
             print("Error: could not perform action. Error details:", str(e), ". Trying again.")
 
     def update_commands_and_narrate(self, response):
-        command, label, value, goal = response["action"], response.get("label", ""), str(response.get("value", "")), response.get("goal", "")
+        command, label, value, goal = response["action"], str(response.get("label", "")), str(response.get("value", "")), response.get("goal", "")
         action_details = "taking action with command: " + command
         if label:
             action_details += ", label: " + label
         if value:
             action_details += ", value: " + value
-        action_details += ", and goal: " + goal
 
         self.past_commands.append(action_details)
         print(action_details)
