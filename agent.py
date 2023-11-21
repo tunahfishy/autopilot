@@ -85,16 +85,18 @@ class Agent:
                         }} 
                     }}
                     result[index] = selector;
-                    element.style.border = "1px solid brown";
+                    element.style.border = "2px solid brown";
                     const label = document.createElement("span");
                     label.className = "autopilot-generated-label";
                     label.textContent = index;
                     label.style.position = "absolute";
+                    label.style.lineHeight = "16px";
                     label.style.padding = "1px";
                     label.style.top = (window.scrollY + rect.top) + "px";
                     label.style.left = (window.scrollX + rect.left) + "px"; 
                     label.style.color = "white";
                     label.style.fontWeight = "bold";
+                    label.style.fontSize = "16px";
                     label.style.backgroundColor = "brown";
                     label.style.zIndex = 10000;
                     document.body.appendChild(label);
@@ -127,7 +129,7 @@ class Agent:
                     BACKGROUND:
                     Your end goal is the following: {self.prompt}
 
-                    You are currently on a specific page of {get_base_url(self.page.url)}, which shown in the first image. The second image is an annotated version of your current page, highlighting the elements that you can interact with. 
+                    You are currently on a specific page of {get_base_url(self.page.url)}, which shown in the image. The image is an annotated version of your current page, with bounding boxes drawn around each element that you can interact with. At the top left of the bounding box is a number that corresponds to the label of the element. If an element doesn't have a bounding box around it, you cannot interact with it.
 
                     Here are the following actions you can take on a page:
                     - CLICK: click a specific element on the page
@@ -146,14 +148,14 @@ class Agent:
                     1. Have you achieved your end goal? 
                         - If not, what is the next step you might need to take to get closer to your end goal? 
                         - If you have achieved your end goal, skip to step 8 and output {{"action": "END"}}.
-                    2. Describe what you see on the current page you are on. Only describe visible elements. Do not infer what else may be on rest of the page. 
-                        - What on this page could be helpful in getting closer to the end goal?
+                    2. Describe the elements you see in the image. Do not infer what else may be on rest of the page. 
+                        - What on this image could be helpful in getting closer to the end goal?
                         - What do you predict would happen if you interacted with these elements?
                     3. What might be on the page that is not currently showing but could appear via scrolling? How would these be helpful in getting closer to the end goal?
                     4. Which of the elements you described in step 1 or 2 would be the best to interact with to help you achieve your goal? Is this element currently visible on the page?
                     5. Based on the elements you described in step 3, determine whether to scroll or not.
                     6. If you need to scroll, determine whether to scroll up or down. 
-                    7. If you don't need to scroll, visually describe the element you will interact with to help you achieve your goal. Then, identify the label number of this element in the second image. What action will you take on this element?
+                    7. If you don't need to scroll, visually describe the element you will interact with to help you achieve your goal. Then, identify the label number of this element in the image. What action will you take on this element?
                     8. Output your final action on the current page. Begin your response with "RESPONSE: ".
                         - If you are scrolling or going back, output a JSON command in the following format: {{"action": ACTION}}
                         - If you are clicking, output a JSON command in the following format: {{"action": ACTION, "label": LABEL_NUMBER}}
@@ -163,13 +165,13 @@ class Agent:
                     Complete all the steps 1-8, showing your work for each step.
                     """
                 },
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{self.base64_image}",
-                        "detail": "high"
-                    },
-                },
+                # {
+                #     "type": "image_url",
+                #     "image_url": {
+                #         "url": f"data:image/jpeg;base64,{self.base64_image}",
+                #         "detail": "high"
+                #     },
+                # },
                 {
                     "type": "image_url",
                     "image_url": {
@@ -181,7 +183,7 @@ class Agent:
             }
         ],
         max_tokens=4096,
-        # temperature=0.0,
+        temperature=0.0,
         )
 
         responseData = response.choices[0].message.content
