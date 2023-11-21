@@ -45,7 +45,7 @@ class Agent:
         page.wait_for_timeout(2000)
         
     def get_page_info(self, page, save_path: str):
-        print("Annotating", self.page.url(), "...")
+        print("Annotating", self.page.url, "...")
         page.screenshot(path=save_path)
         element_info = page.evaluate(f'''() => {{
             const elements = Array.from(document.querySelectorAll("a, button, input"));
@@ -73,13 +73,13 @@ class Agent:
                 );
 
                 if (inViewport && isVisible && !isHiddenByAncestors(element)) {{
-                    let selector = element.tagName.toLowerCase();
+                    let label = element.tagName.toLowerCase();
                     for (const attr of element.attributes) {{
                         if (attr.name !== "style" && attr.name !== "class") {{
-                            selector += `[${{attr.name}}="${{attr.value}}"]`;
+                            label += `[${{attr.name}}="${{attr.value}}"]`;
                         }} 
                     }}
-                    result[index] = selector;
+                    result[index] = label;
                     element.style.border = "1px solid blue";
                     const label = document.createElement("span");
                     label.className = "autopilot-generated-label";
@@ -120,11 +120,11 @@ class Agent:
                     "type": "text", 
                     "text": f"""You are an intelligent agent controlling a browser with the following end goal: {self.prompt}.
                     You are on the page shown in these images. The first image is the page and the second is an annotated version that will help you select elements on the page. You will be provided with a task that will require you to interact with the browser and navigate to different pages. 
-                    For each step, you will first try to understand the current page that you are on. Then you will think about your goal at the current step to help you achieve the end goal, which of the seven actions you can take to help you achieve this goal, and which element will help you perform this immediate action. You will then return this output in the format of one of the following JSON commands:
+                    For each step, you will first try to understand the current page that you are on. What on this page might be able to help you achieve the end goal? Are there any helpful elements that should be on this page but might only be visible if you scroll? Which of the seven actions you can take to help you achieve this goal? and which element will help you perform this immediate action? You will then return this output in the format of one of the following JSON commands:
 
-                    1. {{"action": "CLICK", "goal": "This image of an apple will allow me to navigate to its purchase page", "selector": "label number to click"}} - click on a link, button, or input that has the associated blue label number in the image
-                    2. {{"action": "TYPE", "goal": "I must type my username in this input to login to put the apple in the cart", "selector": "label number to click", "value": "apple"}} - type text 'apple' into an input that has the associated blue label number. Use this only if you don't want to submit right after typing.
-                    3. {{"action": "TYPE_AND_SUBMIT", "goal": "typing 'apple' into the searchbar will allow me to find the apple selection", "selector": "label number to click", value: "apple"}} - type text 'apple' into an input with the associated blue label number and press enter
+                    1. {{"action": "CLICK", "goal": "This image of an apple will allow me to navigate to its purchase page", "label": "label number to click"}} - click on a link, button, or input that has the associated blue label number in the image
+                    2. {{"action": "TYPE", "goal": "I must type my username in this input to login to put the apple in the cart", "label": "label number to click", "value": "apple"}} - type text 'apple' into an input that has the associated blue label number. Use this only if you don't want to submit right after typing.
+                    3. {{"action": "TYPE_AND_SUBMIT", "goal": "typing 'apple' into the searchbar will allow me to find the apple selection", "label": "label number to click", value: "apple"}} - type text 'apple' into an input with the associated blue label number and press enter
                     4. {{"action": "GO_BACK", "goal": "I've clicked the same button multiple times and it looks like this page doesn't have what I'm looking for. I should backtrack"}} - go back to the previous page
                     5. {{"action": "SCROLL_DOWN", "goal": "I'm on the apple product page but I don't see the checkout button, I assume it is further down the page."}} - scroll down the 3/4ths of the page
                     6. {{"action": "SCROLL_UP", "goal": "I have scrolled down but now must press the cart button at the top of the page"}} - scroll up the 3/4ths of the page
@@ -161,19 +161,19 @@ class Agent:
         return json.loads(responseData)
 
     # can use match case if python3.10
-    def select_action(self, command: str, selector: str, value:str):
-        if selector: 
-            selector = self.elements[selector]
+    def select_action(self, command: str, label: str, value:str):
+        if label: 
+            label = self.elements[label]
 
         if command == "CLICK":
-            print("Clicking on element with selector", selector)
-            return click_element(self.page, selector)
+            print("Clicking on element with label", label)
+            return click_element(self.page, label)
         elif command == "TYPE":
-            print("Typing...", value, selector)
-            return type(self.page, selector, value)
+            print("Typing...", value, label)
+            return type(self.page, label, value)
         elif command == "TYPE_AND_SUBMIT":
-            print("Typing and submitting...", value, selector)
-            return type_and_submit(self.page, selector, value)
+            print("Typing and submitting...", value, label)
+            return type_and_submit(self.page, label, value)
         elif command == "GO_BACK":
             print("Going back...")
             return go_back(self.page)
@@ -190,12 +190,24 @@ class Agent:
             print("Invalid command")
             return None
 
-    def perform_action(self, action: str, selector: str, value: str):
+    def perform_action(self, action: str, label: str, value: str):
         try: 
-            self.select_action(action, selector, value)
+            self.select_action(action, label, value)
         except Exception as e:
-            print("Error: could not perform action. Error details:", str(e))
+            print("Error: could not perform action. Error details:", str(e), ". Trying again.")
 
+    def update_commands_and_narrate(self, response):
+        command, label, value, goal = response["action"], response.get("label", ""), str(response.get("value", "")), response.get("goal", "")
+        action_details = "taking action with command: " + command
+        if label:
+            action_details += ", label: " + label
+        if value:
+            action_details += ", value: " + value
+        action_details += ", and goal: " + goal
+
+        self.past_commands.append(action_details)
+        print(action_details)
+        return command, label, value
 
     def complete_task(self, prompt: str):
         self.set_prompt(prompt)
@@ -205,7 +217,7 @@ class Agent:
             browser = chromium.launch(headless=False)
             page = browser.new_page()
             page.set_viewport_size({"width": page.viewport_size["width"], "height": page.viewport_size["height"]})
-            page.goto(self.url)
+            page.goto(self.starting_url)
             self.page = page
 
             while True:
@@ -214,11 +226,9 @@ class Agent:
                 self.get_page_info(page, screenshot_path)
                 self.encode_images(screenshot_path)
                 response = self.get_gpt_command()
-                command, selector, value, goal = response["action"], response.get("selector", ""), str(response.get("value", "")), response.get("goal", "")
-                self.past_commands.append("command: " + command + ", value: " + value + ", goal: " + goal)
-                print("taking action with command:", command + ", selector:", selector + ", and value:", value + ", goal:", goal)
+                command, label, value = self.update_commands_and_narrate(response)
                 self.clear_page_info(page)
-                self.perform_action(command, selector, value)
+                self.perform_action(command, label, value)
                 if command == "END":
                     print("Task completed after", self.iterations, "iterations!")
                     break
