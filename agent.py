@@ -8,7 +8,7 @@ class Agent:
         self.name = "Bot"
         self.prompt = ""
         self.client = client
-        self.url = "https://amazon.com/"
+        self.starting_url = "https://amazon.com/"
         self.page = None
         self.base64_image = None
         self.base64_image_annotated = None
@@ -45,7 +45,7 @@ class Agent:
         page.wait_for_timeout(2000)
         
     def get_page_info(self, page, save_path: str):
-        print("Annotating", self.url, "...")
+        print("Annotating", self.page.url(), "...")
         page.screenshot(path=save_path)
         element_info = page.evaluate(f'''() => {{
             const elements = Array.from(document.querySelectorAll("a, button, input"));
@@ -190,9 +190,7 @@ class Agent:
             print("Invalid command")
             return None
 
-    # click for now
     def perform_action(self, action: str, selector: str, value: str):
-        print("Performing action...", action)
         try: 
             self.select_action(action, selector, value)
         except Exception as e:
@@ -211,7 +209,7 @@ class Agent:
             self.page = page
 
             while True:
-                print(self.name, "is on iteration", self.iterations)
+                print("🤖", self.name, "is on iteration", self.iterations)
                 screenshot_path = f'screenshots/{self.iterations}.png'
                 self.get_page_info(page, screenshot_path)
                 self.encode_images(screenshot_path)
@@ -225,7 +223,4 @@ class Agent:
                     print("Task completed after", self.iterations, "iterations!")
                     break
                 self.iterations += 1
-                print()
-
-
-        
+                print()       

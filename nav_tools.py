@@ -11,7 +11,7 @@ def scroll_down(page):
     page.wait_for_timeout(2000)
 
 def click_element(page, selector):
-    page.eval_on_selector(selector, 'element => element.style.border = "3px solid red"')
+    page.eval_on_selector(selector, 'element => { element.style.border = "3px solid red"; element.removeAttribute("target"); }')
     page.click(selector, force=True)
     page.wait_for_timeout(2000)
 
