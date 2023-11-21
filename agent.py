@@ -178,6 +178,8 @@ class Agent:
         )
 
         responseData = response.choices[0].message.content
+        print("CoT:", responseData)
+        responseData = responseData.split("RESPONSE:")[-1]
         if responseData[0] != "{":
             responseData = responseData[responseData.index("{"):responseData.rindex("}")+1]
         return json.loads(responseData)
