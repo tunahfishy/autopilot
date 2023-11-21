@@ -29,7 +29,7 @@ class Agent:
         self.prompt = prompt
 
     def encode_images(self, image_path: str):
-        with open(image_path, "rb") as image_file:
+        with open(image_path + ".png", "rb") as image_file:
             image = base64.b64encode(image_file.read()).decode('utf-8')
             self.base64_image = image
         with open(image_path + ".annotated.png", "rb") as image_file:
@@ -53,7 +53,7 @@ class Agent:
     # get's initial and annotated sreenshots, finds html of all interactable elemtns 
     def get_page_info(self, page, save_path: str):
         print("Annotating", self.page.url, "...")
-        page.screenshot(path=save_path)
+        page.screenshot(path=save_path + ".png")
         label_selectors, label_simplified_htmls = page.evaluate(f'''() => {{
             const elements = Array.from(document.querySelectorAll("a, button, input, textarea, select"));
             let label_selectors = {{}};
@@ -82,10 +82,30 @@ class Agent:
 
                 if (inViewport && isVisible && !isHiddenByAncestors(element)) {{
                     let selector = element.tagName.toLowerCase();
-                    let html = element.cloneNode(true);
-                    html.innerHTML = '';
-                    html.textContent = element.textContent;
-                    let simplified_html = html.outerHTML;
+                    let simplified_html = '<' + element.tagName.toLowerCase();
+                    for (const attr of ['id', 'class', 'name', 'type', 'value', 'src', 'alt']) {{
+                        if (element.hasAttribute(attr)) {{
+                            let attrValue = element.getAttribute(attr);
+                            if (attr === 'class') {{
+                                let classList = attrValue.split(' ');
+                                if (classList.length > 3) {{
+                                    attrValue = classList.slice(0, 3).join(' ');
+                                }}
+                            }}
+                            if (attr === 'href') {{
+                                let parts = attrValue.split('/');
+                                if (parts.length > 3) {{
+                                    // If the URL starts with http:// or https://, include the first 5 parts (protocol, empty, domain, and two path segments)
+                                    // Otherwise, include the first 3 parts (domain and one path segment)
+                                    let limit = parts[0].startsWith('http') ? 5 : 3;
+                                    attrValue = parts.slice(0, limit).join('/');
+                                }}
+                            }}
+                            simplified_html += ` ${{attr}}="${{attrValue}}"`;
+                        }}
+                    }}
+                    simplified_html = simplified_html + '>' + element.textContent + '</' + element.tagName.toLowerCase() + '>'                              
+                    simplified_html = simplified_html.replace(/\s+/g, ' ').trim();                                 
                     for (const attr of element.attributes) {{
                         if (attr.name !== "style" && attr.name !== "class") {{
                             selector += `[${{attr.name}}="${{attr.value}}"]`;
@@ -93,7 +113,6 @@ class Agent:
                     }}
                     label_selectors[index] = selector;
                     label_simplified_htmls[index] = simplified_html;
-                    result[index] = (selector, element.outerHTML);
                     element.style.border = "2px solid brown";
                     const label = document.createElement("span");
                     label.className = "autopilot-generated-label";
@@ -116,15 +135,13 @@ class Agent:
         page.wait_for_timeout(2000)
         page.screenshot(path=save_path + ".annotated.png")
 
-        self.label_selectors = label_selectors, 
+        self.label_selectors = label_selectors
         self.label_simplified_htmls = label_simplified_htmls
-        print(label_simplified_htmls)
-        print(label_selectors)
 
         # Save to JSON file
         with open(f'element_selectors/{self.iterations}.json', 'w') as f:
             json.dump(self.label_selectors, f, indent=4)
-        with open(f'elements_htmls/{self.iterations}.json', 'w') as f:
+        with open(f'element_htmls/{self.iterations}.json', 'w') as f:
             json.dump(self.label_simplified_htmls, f, indent=4)
 
     def get_gpt_command(self):
@@ -240,10 +257,10 @@ class Agent:
         try: 
             self.select_action(action, label, value)
         except Exception as e:
-            print("Error: could not perform action. Error details:", str(e), ". Trying again.")
+            print("Error: could not perform action. Error details:", str(e) + ". Trying again.")
 
     def update_commands_and_narrate(self, response):
-        command, label, value = response["action"], str(response.get("label", "")), str(response.get("value", "")), response.get("goal", "")
+        command, label, value = response["action"], str(response.get("label", "")), str(response.get("value", ""))
         action_details = "taking action with command: " + command
         if label:
             action_details += ", label: " + label
@@ -267,7 +284,7 @@ class Agent:
 
             while True:
                 print("🤖", self.name, "is on iteration", self.iterations)
-                screenshot_path = f'screenshots/{self.iterations}.png'
+                screenshot_path = f'screenshots/{self.iterations}'
                 self.get_page_info(page, screenshot_path)
                 self.encode_images(screenshot_path)
                 response = self.get_gpt_command()
