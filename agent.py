@@ -1,7 +1,12 @@
-from nav_tools import scroll_up, scroll_down, click_element, type, type_and_submit, go_back, end
-from playwright.sync_api import sync_playwright
-import json
 import base64
+import json
+
+from playwright.sync_api import sync_playwright
+
+from nav_tools import (click_element, end, go_back, scroll_down, scroll_up,
+                       type, type_and_submit)
+from utils import get_base_url
+
 
 class Agent:
     def __init__(self, client):
@@ -118,21 +123,38 @@ class Agent:
             "content": [
                 {
                     "type": "text", 
-                    "text": f"""You are an intelligent agent controlling a browser with the following end goal: {self.prompt}.
-                    You are on the page shown in these images. The first image is the page and the second is an annotated version that will help you select elements on the page. You will be provided with a task that will require you to interact with the browser and navigate to different pages. 
-                    For each step, you will first try to understand the current page that you are on. Then you will think about your goal at the current step to help you achieve the end goal, which of the seven actions you can take to help you achieve this goal, and which element will help you perform this immediate action. You will then return this output in the format of one of the following JSON commands:
+                    "text": f"""
+                    BACKGROUND:
+                    Your end goal is the following: {self.prompt}
 
-                    1. {{"action": "CLICK", "goal": "This image of an apple will allow me to navigate to its purchase page", "selector": "label number to click"}} - click on a link, button, or input that has the associated blue label number in the image
-                    2. {{"action": "TYPE", "goal": "I must type my username in this input to login to put the apple in the cart", "selector": "label number to click", "value": "apple"}} - type text 'apple' into an input that has the associated blue label number. Use this only if you don't want to submit right after typing.
-                    3. {{"action": "TYPE_AND_SUBMIT", "goal": "typing 'apple' into the searchbar will allow me to find the apple selection", "selector": "label number to click", value: "apple"}} - type text 'apple' into an input with the associated blue label number and press enter
-                    4. {{"action": "GO_BACK", "goal": "I've clicked the same button multiple times and it looks like this page doesn't have what I'm looking for. I should backtrack"}} - go back to the previous page
-                    5. {{"action": "SCROLL_DOWN", "goal": "I'm on the apple product page but I don't see the checkout button, I assume it is further down the page."}} - scroll down the 3/4ths of the page
-                    6. {{"action": "SCROLL_UP", "goal": "I have scrolled down but now must press the cart button at the top of the page"}} - scroll up the 3/4ths of the page
-                    7. {{"action": "END", "goal": "I have succesfully added the apple to the cart and enteblue payment information"}} - indicate you've successfully completed the task
+                    You are currently on a specific page of {get_base_url(self.page.url())}, which shown in the first image. The second image is an annotated version of your current page, highlighting the elements that you can interact with. 
 
-                    Based on the following task, return ONLY THE JSON in the exact provided format above. Do not return anything beyond JSON. Do not return an action that is not "CLICK", "TYPE", "TYPE_AND_SUBMIT", "GO_BACK", "SCROLL_UP", "SCROLL_DOWN", or "END". Any deviation will cause the system to fail.
+                    Here are the following actions you can take on a page:
+                    - CLICK: click a specific element on the page
+                    - SCROLL_DOWN: scroll down on the page
+                    - SCROLL_UP: scroll up on the page
+                    - TYPE: type text into a text input
+                    - TYPE_AND_SUBMIT: : type text into a text input and press enter
+                    - GO_BACK: go back to the previous page
+                    - END: declare that you have completed the task
+                    
 
-                    For guidance, here is the history of your past goals for the actions you have already tried. This should prevent you from repeating actions that don't work: {self.past_commands}
+                    TASK:
+                    Complete steps 1-5, showing your work for each step. Be detailed in your reasoning and answer all questions. Completing these steps will help you achieve your end goal.
+
+
+                    TASK STEPS:
+                    1. Have you achieved your end goal? If not, what is the next step you might need to take to get closer to your end goal? If you have achieved your end goal, skip to step 8 and output {{"action": "END"}}.
+                    2. Describe what you see on the current page you are on. What on this page could be helpful in getting closer to the end goal? What do you predict would happen if you interacted with these elements?
+                    3. What might be on the page that is not currently showing but could appear via scrolling? How would these be helpful in getting closer to the end goal?
+                    4. Which of the elements you described in step 1 or 2 would be the best to interact with to help you achieve your goal? Is this element currently visible on the page?
+                    5. Based on the elements you described in step 3, determine whether to scroll or not.
+                    6. If you need to scroll, determine whether to scroll up or down. 
+                    7. If you don't need to scroll, visually describe the element you will interact with to help you achieve your goal. Then, identify the label number of this element in the second image. What action will you take on this element?
+                    8. Output your final action on the current page. Begin your response with "RESPONSE: ".
+                        - If you are scrolling or going back, output a JSON command in the following format: {{"action": ACTION}}
+                        - If you are clicking, output a JSON command in the following format: {{"action": ACTION, "label": LABEL_NUMBER}}
+                        - If you are typing, output a JSON command in the following format: {{"action": ACTION, "label": LABEL_NUMBER, "value": "TEXT_TO_TYPE"}}
                     """
                 },
                 {
