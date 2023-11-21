@@ -24,6 +24,7 @@ if __name__ == "__main__":
     try: 
         agent.complete_task(user_prompt)
     except KeyboardInterrupt:
+        print()
         print("Keyboard Interrupt, exiting gracefully...")
 
  
