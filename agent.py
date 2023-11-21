@@ -84,6 +84,7 @@ class Agent:
                     let selector = element.tagName.toLowerCase();
                     let html = element.cloneNode(true);
                     html.innerHTML = '';
+                    html.textContent = element.textContent;
                     let simplified_html = html.outerHTML;
                     for (const attr of element.attributes) {{
                         if (attr.name !== "style" && attr.name !== "class") {{
