@@ -63,7 +63,7 @@ class Agent:
 
     def get_gpt_command(self):
         print("Generating command...")
-        for _ in range(5):
+        for _ in range(3):
             try:
                 response = self.client.chat.completions.create(
                 model="gpt-4-vision-preview",
@@ -101,7 +101,7 @@ class Agent:
                                 - What do you predict would happen if you interacted with these elements?
                             3. Based on prior knowledge of websites with this structure and function, what might be on the page that is not currently showing but could appear via scrolling? For example, maybe pricing is found in a footer or a 'buy now' button may be lower down the page. How would these be helpful in getting closer to the end goal?
                             4. Which of the elements you described in step 1 or 2 would be the best to interact with to help you achieve your goal? Based on this, determine whether to scroll up, down, or not.
-                            5. Is this action similar to one that you took in the past? If so, are you further along now than you were when you did the previous action? Would taking this action again be helpful in getting closer to the end goal? If it wouldn't, try not to take it. Here was the thought process for the last action that you succesfully took: {self.past_commands[-1]}
+                            5. Is this action similar to one that you took in the past? If so, are you further along now than you were when you did the previous action? Would taking this action again be helpful in getting closer to the end goal? If it wouldn't, try not to take it. Here was the thought process for the last action that you succesfully took. Remember that the label numbers may be different than the last step: {self.past_commands[-1]}
                             6. If you don't need to scroll, visually describe the element you will interact with to help you achieve your goal. Then, identify the label number of this element in the image. What action will you take on this element?
                             7. Output your final action on the current page. Begin your response with "RESPONSE: ".
                                 - If you are scrolling or going back, output a JSON command in the following format: {{"action": ACTION}}
@@ -179,7 +179,7 @@ class Agent:
             print("Error: could not perform action. Error details:", str(e) + ". Trying again.")
 
     def update_last_command(self, response):
-        pattern = r"6\.[^.]*\. Then, identify the label number of this element in the image. What action will you take on this element\? (.*?)7\."
+        pattern = r"6\.[^.]*\.(?: Then, identify the label number of this element in the image.)?(?: What action will you take on this element\?)? (.*?)7\."
         match = re.search(pattern, response, re.DOTALL)        
         # If a match is found, the matched text is in group 1
         if match:
