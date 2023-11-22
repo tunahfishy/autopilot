@@ -19,6 +19,7 @@ def clear_files():
 
 if __name__ == "__main__":
     user_prompt = input("🤖 Bot: What would you like me to do? ")
+    print("🤖 Bot: Working on it!")
     print()
 
     # clear the elements and screenshots folders
