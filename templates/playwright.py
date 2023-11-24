@@ -27,24 +27,9 @@ ANNOTATE_PAGE_TEMPLATE = f'''() => {{
         if (inViewport && isVisible && !isHiddenByAncestors(element)) {{
             let selector = element.tagName.toLowerCase();
             let simplified_html = '<' + element.tagName.toLowerCase();
-            for (const attr of ['id', 'class', 'name', 'type', 'value', 'src', 'alt']) {{
+            for (const attr of ['aria-label', 'alt', 'placeholder', 'value']) {{
                 if (element.hasAttribute(attr)) {{
                     let attrValue = element.getAttribute(attr);
-                    if (attr === 'class') {{
-                        let classList = attrValue.split(' ');
-                        if (classList.length > 3) {{
-                            attrValue = classList.slice(0, 2).join(' ');
-                        }}
-                    }}
-                    if (attr === 'href') {{
-                        let parts = attrValue.split('/');
-                        if (parts.length > 3) {{
-                            // If the URL starts with http:// or https://, include the first 5 parts (protocol, empty, domain, and two path segments)
-                            // Otherwise, include the first 3 parts (domain and one path segment)
-                            let limit = parts[0].startsWith('http') ? 5 : 3;
-                            attrValue = parts.slice(0, limit).join('/');
-                        }}
-                    }}
                     simplified_html += ` ${{attr}}="${{attrValue}}"`;
                 }}
             }}
@@ -53,7 +38,8 @@ ANNOTATE_PAGE_TEMPLATE = f'''() => {{
             simplified_html = simplified_html.replace(/\s+/g, ' ').trim();                                 
             for (const attr of element.attributes) {{
                 if (attr.name !== "style" && attr.name !== "class") {{
-                    selector += `[${{attr.name}}="${{attr.value}}"]`;
+                    attr_value = attr.value.replace('"', "'").replace(';', ',')
+                    selector += `[${{attr.name}}="${{attr_value}}"]`;
                 }} 
             }}
             label_selectors[index] = selector;

@@ -16,7 +16,7 @@ class Agent:
         self.name = "Bot"
         self.prompt = ""
         self.client = client
-        self.starting_url = "https://www.amazon.com/Apple-2023-MacBook-Laptop-chip/dp/B0C75ZRQLB/ref=sr_1_3?crid=2N4KGFW2ATRK0&keywords=macbook&qid=1700628543&sprefix=macbook%2Caps%2C122&sr=8-3"
+        self.starting_url = "https://www.amazon.com"
         self.page = None
         self.base64_image = None
         self.base64_image_annotated = None
@@ -229,4 +229,4 @@ class Agent:
                     print("Task completed after", self.iterations, "iterations!")
                     break
                 self.iterations += 1
-                print()    
+                print()  
