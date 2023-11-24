@@ -96,7 +96,7 @@ class Agent:
                             1. Have you achieved your end goal? 
                                 - If not, what is the next step you might need to take to get closer to your end goal? 
                                 - If you have achieved your end goal, skip to step 6 and output {{"action": "END"}}.
-                            2. Look at the mapping of each label value to its simplified HTML. Using the HTML and its associated labeled area on the image to help understand what it does: {self.label_simplified_htmls}. Do not infer what else may be on rest of the page. 
+                            2. Look at the mapping of each label on the image to its simplified HTML. Using the HTML and its associated labeled area on the image to help understand what it does: {self.label_simplified_htmls}. Remember that some labeled elements  are visibly covered by popups and overlays and may therefore not be clickable. Do not infer what else may be on rest of the page. 
                                 - Which element should you interact with to help you achieve your goal?
                             3. Based on prior knowledge of websites with this structure and function, should you scroll? For example, maybe pricing is found in a footer or a 'buy now' button may be lower down the page. 
                             4. Is this action similar to the last item you took? Avoid getting stuck repeating actions that don't work. If want to take the same action as before, consider additional inputs that must be filled in, such as choosing a size. These additional inputs may be seen on the page. Your last successful action (with possibly different labels): {self.past_commands[-1]}
