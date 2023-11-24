@@ -38,8 +38,9 @@ ANNOTATE_PAGE_TEMPLATE = f'''() => {{
             simplified_html = simplified_html.replace(/\s+/g, ' ').trim();                                 
             for (const attr of element.attributes) {{
                 if (attr.name !== "style" && attr.name !== "class") {{
-                    attr_value = attr.value.replace('"', "'").replace(';', ',')
-                    selector += `[${{attr.name}}="${{attr_value}}"]`;
+                    if (!attr.value.includes('"') && !attr.value.includes(';')) {{
+                        selector += `[${{attr.name}}="${{attr.value}}"]`;
+                    }}
                 }} 
             }}
             label_selectors[index] = selector;

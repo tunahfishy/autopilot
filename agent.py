@@ -81,35 +81,33 @@ class Agent:
 
                             Here are the following actions you can take on a page:
                             - CLICK: click a specific element on the page
-                            - SCROLL_DOWN: scroll down on the page
-                            - SCROLL_UP: scroll up on the page
                             - TYPE: type text into a text input or textarea
                             - TYPE_AND_SUBMIT: type text into a text input or textarea and press enter
+                            - SCROLL_DOWN: scroll down on the page
+                            - SCROLL_UP: scroll up on the page
                             - GO_BACK: go back to the previous page
                             - END: declare that you have completed the task
                             
 
                             TASK:
-                            Complete steps 1-7, showing your work for each step. Be detailed in your reasoning and answer all questions. Completing these steps will help you achieve your end goal.
+                            Complete steps 1-6, showing your work for each step. Be detailed in your reasoning and answer all questions. Completing these steps will help you achieve your end goal.
 
                             TASK STEPS:
                             1. Have you achieved your end goal? 
                                 - If not, what is the next step you might need to take to get closer to your end goal? 
                                 - If you have achieved your end goal, skip to step 6 and output {{"action": "END"}}.
                             2. Look at the mapping of each label value to its simplified HTML. Using the HTML and its associated labeled area on the image to help understand what it does: {self.label_simplified_htmls}. Do not infer what else may be on rest of the page. 
-                                - What on this image could be helpful in getting closer to the end goal?
-                                - What do you predict would happen if you interacted with these elements?
-                            3. Based on prior knowledge of websites with this structure and function, what might be on the page that is not currently showing but could appear via scrolling? For example, maybe pricing is found in a footer or a 'buy now' button may be lower down the page. How would these be helpful in getting closer to the end goal?
-                            4. Which of the elements you described in step 1 or 2 would be the best to interact with to help you achieve your goal? Based on this, determine whether to scroll up, down, or not.
-                            5. Is this action similar to one that you took in the past? If so, are you further along now than you were when you did the previous action? Would taking this action again be helpful in getting closer to the end goal? If it wouldn't, try not to take it. Here was the thought process for the last action that you succesfully took. Remember that the label numbers may be different than the last step: {self.past_commands[-1]}
-                            6. If you don't need to scroll, visually describe the element you will interact with to help you achieve your goal. Then, identify the label number of this element in the image. What action will you take on this element?
-                            7. Output your final action on the current page. Begin your response with "RESPONSE: ".
+                                - Which element should you interact with to help you achieve your goal?
+                            3. Based on prior knowledge of websites with this structure and function, should you scroll? For example, maybe pricing is found in a footer or a 'buy now' button may be lower down the page. 
+                            4. Is this action similar to the last item you took? Avoid getting stuck repeating actions that don't work. If want to take the same action as before, consider additional inputs that must be filled in, such as choosing a size. These additional inputs may be seen on the page. Your last successful action (with possibly different labels): {self.past_commands[-1]}
+                            5. If you don't need to scroll, visually describe the element you will interact with to help you achieve your goal and how it will help you achieve it. Then, identify the label number of this element in the image. What action will you take on this element?
+                            6. Output your final action on the current page. Begin your response with "RESPONSE: ".
                                 - If you are scrolling or going back, output a JSON command in the following format: {{"action": ACTION}}
                                 - If you are clicking, output a JSON command in the following format: {{"action": ACTION, "label": LABEL_NUMBER}}
                                 - If you are typing, output a JSON command in the following format: {{"action": ACTION, "label": LABEL_NUMBER, "value": "TEXT_TO_TYPE"}}
 
                             REMEMBER:
-                            Complete all the steps 1-7, showing your work for each step.
+                            Complete all the steps 1-6, briefly showing your work for each step.
                             """
                         },
                         {
@@ -179,17 +177,17 @@ class Agent:
             print("Error: could not perform action. Error details:", str(e) + ". Trying again.")
 
     def update_last_command(self, response):
-        pattern = r"6\.[^.]*\.(?: Then, identify the label number of this element in the image.)?(?: What action will you take on this element\?)? (.*?)7\."
+        pattern = r"\? (.*?)6\."
         match = re.search(pattern, response, re.DOTALL)        
         # If a match is found, the matched text is in group 1
         if match:
-            item_6_text = match.group(1).strip().strip()
-            item_6_text = item_6_text.replace('\n', ' ')
+            item_5_text = match.group(1).strip().strip()
+            item_5_text = item_5_text.replace('\n', ' ')
         else:
-            item_6_text = "No match found"
+            item_5_text = response
         print()
-        print("PAST COMMAND GIVEN:", item_6_text)
-        self.past_commands.append(item_6_text)
+        print("PAST COMMAND GIVEN:", item_5_text)
+        self.past_commands.append(item_5_text)
 
     def update_history_and_narrate(self, response):
         command, label, value = response["action"], str(response.get("label", "")), str(response.get("value", ""))
