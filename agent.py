@@ -16,7 +16,7 @@ class Agent:
         self.name = "Bot"
         self.prompt = ""
         self.client = client
-        self.starting_url = "https://www.amazon.com"
+        self.starting_url = "https://google.com"
         self.page = None
         self.base64_image = None
         self.base64_image_annotated = None
@@ -177,7 +177,7 @@ class Agent:
             print("Error: could not perform action. Error details:", str(e) + ". Trying again.")
 
     def update_last_command(self, response):
-        pattern = r"\? (.*?)6\."
+        pattern = r"5\. \? (.*?)6\."
         match = re.search(pattern, response, re.DOTALL)        
         # If a match is found, the matched text is in group 1
         if match:
