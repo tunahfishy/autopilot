@@ -12,6 +12,30 @@ ANNOTATE_PAGE_TEMPLATE = f'''() => {{
         }}
         return false;
     }}
+
+    const getCssSelector = (element: Element): string => {{
+        if (element === null) return "";
+        let path = [];
+        while (element && element.nodeType === Node.ELEMENT_NODE) {{
+        let selector = element.nodeName.toLowerCase();
+        if (element.id) {{
+            selector += "#" + element.id;
+            path.unshift(selector);
+            break;
+        }} else {{
+            let sib: Element | null = element;
+            let nth = 1;
+            while ((sib = sib.previousElementSibling)) {{
+            if (sib.nodeName.toLowerCase() == selector) nth++;
+            }}
+            if (nth != 1) selector += ":nth-of-type(" + nth + ")";
+        }}
+        path.unshift(selector);
+        element = element.parentNode as Element;
+        }}
+        return path.join(" > ");
+    }};
+
     elements.forEach((element, index) => {{
         const rect = element.getBoundingClientRect();
         const style = window.getComputedStyle(element);
@@ -36,14 +60,9 @@ ANNOTATE_PAGE_TEMPLATE = f'''() => {{
             const textContent = element.textContent.replace(/\\\\n/g, ' ')
             simplified_html = simplified_html + '>' + textContent + '</' + element.tagName.toLowerCase() + '>'                              
             simplified_html = simplified_html.replace(/\s+/g, ' ').trim();                                 
-            for (const attr of element.attributes) {{
-                if (attr.name !== "style" && attr.name !== "class") {{
-                    if (!attr.value.includes('"') && !attr.value.includes(';')) {{
-                        selector += `[${{attr.name}}="${{attr.value}}"]`;
-                    }}
-                }} 
-            }}
-            label_selectors[index] = selector;
+            
+            const cssSelector = getCssSelector(element);
+            label_selectors[index] = cssSelector;
             label_simplified_htmls[index] = simplified_html;
             const rect = element.getBoundingClientRect();
             const newElement = document.createElement('div');
