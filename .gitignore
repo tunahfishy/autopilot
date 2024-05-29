@@ -2,6 +2,6 @@ env/
 .env
 __pycache__/
 *.png
-element_htmls/*
-element_selectors/*
+element_htmls/*.json
+element_selectors/*.json
 screenshots/*
